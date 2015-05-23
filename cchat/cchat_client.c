@@ -6,19 +6,84 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <pthread.h>
 
 #include "packet.h"
 
 #define PORT 4000
 
+pthread_t sender_thread;
+pthread_t listener_thread;
+
+void *sender(void *args) {
+    
+    int sockfd = *(int *)args;
+    
+    char temp[MESSAGE_LEN];
+    
+    long numberOfBytes;
+    
+    while (1) {
+        
+        printf("Enter the message: ");
+        
+        struct PACKET packet;
+        
+        bzero(packet.message, MESSAGE_LEN);
+        fgets(temp, MESSAGE_LEN, stdin);
+        
+        if (strncmp("/exit", temp, 5) == 0) {
+            strcpy(packet.option, "exit");
+            send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
+            return NULL;
+        }
+        else  {
+            strcpy(packet.option, "send");
+        }
+
+        strcpy(packet.message, temp);
+        strcpy(packet.senderAlias, "Alias1");
+        numberOfBytes = send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
+        
+        if (numberOfBytes < 0)
+            printf("ERROR writing to socket\n");
+    }
+    
+    return NULL;
+}
+
+void *listener(void *args) {
+    
+    int sockfd = *(int *)args;
+    long numberOfBytes;
+    
+    struct PACKET packet;
+    
+    
+    while (1) {
+        bzero(packet.message, MESSAGE_LEN);
+        bzero(packet.option, OPTIONS_LEN);
+        bzero(packet.senderAlias, ALIAS_LEN);
+        
+        numberOfBytes = recv(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
+        
+        
+        if (numberOfBytes < 0)
+            printf("ERROR reading from socket\n");
+        
+        printf("%s\n",packet.message);
+    }
+    
+    return NULL;
+}
+
 int main(int argc, char *argv[])
 {
     int sockfd;
-    long numberOfBytes;
+    
     struct sockaddr_in serv_addr;
     struct hostent *server;
     
-    char buffer[256];
     if (argc < 2) {
         fprintf(stderr,"usage %s hostname\n", argv[0]);
         exit(0);
@@ -42,30 +107,12 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
         printf("ERROR connecting\n");
     
-    printf("Enter the message: ");
+    pthread_create(&sender_thread, NULL, sender, &sockfd);
+    pthread_create(&listener_thread, NULL, listener, &sockfd);
     
-    struct PACKET packet;
-    
-    bzero(packet.message, MESSAGE_LEN);
-    fgets(packet.message, MESSAGE_LEN, stdin);
-    
-    strcpy(packet.option, "send");
-    strcpy(packet.senderAlias, "Alias1");
-    
-    /* write in the socket */
-    numberOfBytes = send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
-    if (numberOfBytes < 0)
-        printf("ERROR writing to socket\n");
-    
-    bzero(buffer,256);
-    
-    /* read from the socket */
-    numberOfBytes = read(sockfd, buffer, 256);
-    if (numberOfBytes < 0)
-        printf("ERROR reading from socket\n");
-    
-    printf("%s\n",buffer);
+    pthread_join(sender_thread, NULL);
     
     close(sockfd);
+    
     return 0;
 }
