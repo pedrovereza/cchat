@@ -59,9 +59,10 @@ void channels_init(struct CHANNELS *channels) {
 int channels_contains(struct CHANNELS *channels, char *alias) {
     struct CNODE *current;
     
-    for (current = channels->head; current->next != NULL; current = current->next) {
-        if (!strcmp(current->channel.alias, alias))
+    for (current = channels->head; current != NULL; current = current->next) {
+        if (!strncmp(current->channel.alias, alias, ALIAS_LEN)) {
             return 1;
+        }
     }
     
     return 0;
