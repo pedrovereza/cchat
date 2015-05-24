@@ -72,6 +72,29 @@ int main() {
     return 0;
 }
 
+void switchChannels(char* from, char* to, struct USER *user) {
+    struct CNODE *channelIterator;
+    
+    pthread_mutex_lock(&channels.channels_mutex);
+    channelIterator = channels_find(&channels, to);
+    struct CHANNEL *channelToJoin = &channelIterator->channel;
+    
+    channelIterator = channels_find(&channels, from);
+    struct CHANNEL *channelToLeave = &channelIterator->channel;
+    pthread_mutex_unlock(&channels.channels_mutex);
+    
+    pthread_mutex_lock(&channelToJoin->channel_mutex);
+    channel_insert(channelToJoin, user);
+    pthread_mutex_unlock(&channelToJoin->channel_mutex);
+    
+    bzero(user->channelAlias, ALIAS_LEN);
+    strcpy(user->channelAlias, channelToJoin->alias);
+    
+    pthread_mutex_lock(&channelToLeave->channel_mutex);
+    channel_delete(channelToLeave, user);
+    pthread_mutex_unlock(&channelToLeave->channel_mutex);
+}
+
 void *client_handler(void *fd) {
     struct USER user = *(struct USER *)fd;
     struct PACKET packet;
@@ -96,15 +119,26 @@ void *client_handler(void *fd) {
         if(!strcmp(packet.option, "alias")) {
             printf("Set alias to %s\n", packet.senderAlias);
             
-            pthread_mutex_lock(&defaultChannel.channel_mutex);
-            for(curr = defaultChannel.head; curr != NULL; curr = curr->next) {
+            channelIterator = channels_find(&channels, user.channelAlias);
+            struct CHANNEL *channel = &channelIterator->channel;
+            
+            pthread_mutex_lock(&channel->channel_mutex);
+            for(curr = channel->head; curr != NULL; curr = curr->next) {
                 if(compare(&curr->user, &user) == 0) {
                     strcpy(curr->user.alias, packet.senderAlias);
                     strcpy(user.alias, packet.senderAlias);
                     break;
                 }
             }
-            pthread_mutex_unlock(&defaultChannel.channel_mutex);
+            pthread_mutex_unlock(&channel->channel_mutex);
+            
+            struct PACKET response;
+            memset(&response, 0, sizeof(struct PACKET));
+            strcpy(response.option, "alias-ok");
+            strcpy(response.message, user.alias);
+            
+            send(user.socketfd, (void *)&response, sizeof(struct PACKET), 0);
+
         }
         else if (!strcmp(packet.option, "create")) {
             pthread_mutex_lock(&channels.channels_mutex);
@@ -123,46 +157,11 @@ void *client_handler(void *fd) {
 
         }
         else if (!strcmp(packet.option, "join")) {
-            pthread_mutex_lock(&channels.channels_mutex);
-            channelIterator = channels_find(&channels, packet.message);
-            struct CHANNEL *channelToJoin = &channelIterator->channel;
-            
-            channelIterator = channels_find(&channels, user.channelAlias);
-            struct CHANNEL *channelToLeave = &channelIterator->channel;
-            pthread_mutex_unlock(&channels.channels_mutex);
-            
-            pthread_mutex_lock(&channelToJoin->channel_mutex);
-            channel_insert(channelToJoin, &user);
-            pthread_mutex_unlock(&channelToJoin->channel_mutex);
-            
-            bzero(&user.channelAlias, ALIAS_LEN);
-            strcpy(user.channelAlias, channelToJoin->alias);
-            
-            pthread_mutex_lock(&channelToLeave->channel_mutex);
-            channel_delete(channelToLeave, &user);
-            pthread_mutex_unlock(&channelToLeave->channel_mutex);
+            switchChannels(user.channelAlias, packet.message, &user);
         }
         else if (!strcmp(packet.option, "leave")) {
-            pthread_mutex_lock(&channels.channels_mutex);
-            channelIterator = channels_find(&channels, DEFAULT_CHANNEL_ALIAS);
-            struct CHANNEL *channelToJoin = &channelIterator->channel;
-            
-            channelIterator = channels_find(&channels, user.channelAlias);
-            struct CHANNEL *channelToLeave = &channelIterator->channel;
-            pthread_mutex_unlock(&channels.channels_mutex);
-            
-            pthread_mutex_lock(&channelToJoin->channel_mutex);
-            channel_insert(channelToJoin, &user);
-            pthread_mutex_unlock(&channelToJoin->channel_mutex);
-            
-            bzero(&user.channelAlias, ALIAS_LEN);
-            strcpy(user.channelAlias, channelToJoin->alias);
-            
-            pthread_mutex_lock(&channelToLeave->channel_mutex);
-            channel_delete(channelToLeave, &user);
-            pthread_mutex_unlock(&channelToLeave->channel_mutex);
+            switchChannels(user.channelAlias, DEFAULT_CHANNEL_ALIAS, &user);
         }
-        
         
         else if(!strcmp(packet.option, "send")) {
             pthread_mutex_lock(&channels.channels_mutex);
@@ -180,7 +179,7 @@ void *client_handler(void *fd) {
                 memset(&spacket, 0, sizeof(struct PACKET));
                 
                 strcpy(spacket.option, "msg");
-                strcpy(spacket.senderAlias, packet.senderAlias);
+                strcpy(spacket.senderAlias, user.alias);
                 strcpy(spacket.message, packet.message);
                 sent = send(curr->user.socketfd, (void *)&spacket, sizeof(struct PACKET), 0);
             }

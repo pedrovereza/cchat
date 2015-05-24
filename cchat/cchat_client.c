@@ -15,6 +15,8 @@
 pthread_t sender_thread;
 pthread_t listener_thread;
 
+char currentAlias[ALIAS_LEN];
+
 void *sender(void *args) {
     
     int sockfd = *(int *)args;
@@ -28,8 +30,9 @@ void *sender(void *args) {
         printf("Enter the message: ");
         
         struct PACKET packet;
+        memset(&packet, 0, sizeof(struct PACKET));
+        strcpy(packet.senderAlias, currentAlias);
         
-        bzero(packet.message, MESSAGE_LEN);
         fgets(temp, MESSAGE_LEN, stdin);
         temp[strcspn(temp, "\n")] = 0;
         
@@ -37,6 +40,10 @@ void *sender(void *args) {
             strcpy(packet.option, "exit");
             send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
             return NULL;
+        }
+        else if (!strncmp("/alias", temp, 6)) {
+            strcpy(packet.option, "alias");
+            strncpy(packet.senderAlias, temp + 7, ALIAS_LEN);
         }
         else if (!strncmp("/join", temp, 5)) {
             strcpy(packet.option, "join");
@@ -54,7 +61,7 @@ void *sender(void *args) {
             strcpy(packet.message, temp);
         }
 
-        strcpy(packet.senderAlias, "Alias1");
+
         numberOfBytes = send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
         
         if (numberOfBytes < 0)
@@ -83,7 +90,18 @@ void *listener(void *args) {
         if (numberOfBytes < 0)
             printf("ERROR reading from socket\n");
         
-        printf("%s\n",packet.message);
+        write(1, packet.option, OPTIONS_LEN);
+        
+        if (!strcmp(packet.option, "alias-ok")) {
+            bzero(&currentAlias, ALIAS_LEN);
+            strcpy(currentAlias, packet.message);
+        }
+        else if (!strcmp(packet.option, "msg")) {
+            write(1, packet.senderAlias, ALIAS_LEN);
+            write(1," said:", 7);
+            write(1, packet.message, MESSAGE_LEN);
+            write(1, "\n", 1);
+        }
     }
     
     return NULL;
@@ -92,6 +110,8 @@ void *listener(void *args) {
 int main(int argc, char *argv[])
 {
     int sockfd;
+    bzero(&currentAlias, ALIAS_LEN);
+    strcpy(currentAlias, "Anonymous");
     
     struct sockaddr_in serv_addr;
     struct hostent *server;
