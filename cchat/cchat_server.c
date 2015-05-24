@@ -101,6 +101,7 @@ void *client_handler(void *fd) {
     struct UNODE *curr;
     struct CNODE *channelIterator;
     size_t bytes, sent;
+    struct PACKET response;
     
     while(1) {
         bytes = recv(user.socketfd, (void *)&packet, sizeof(struct PACKET), 0);
@@ -132,7 +133,7 @@ void *client_handler(void *fd) {
             }
             pthread_mutex_unlock(&channel->channel_mutex);
             
-            struct PACKET response;
+
             memset(&response, 0, sizeof(struct PACKET));
             strcpy(response.option, "alias-ok");
             strcpy(response.message, user.alias);
@@ -144,7 +145,11 @@ void *client_handler(void *fd) {
             pthread_mutex_lock(&channels.channels_mutex);
             
             if (channels_contains(&channels, packet.message)) {
-                //error: trying to create a channel with an existing channel alias
+                memset(&response, 0, sizeof(struct PACKET));
+                strcpy(response.option, "error");
+                strcpy(response.message, "Channel already exists.");
+                
+                send(user.socketfd, (void *)&response, sizeof(struct PACKET), 0);
             }
             else {
                 struct CHANNEL newChannel;

@@ -80,21 +80,21 @@ void *listener(void *args) {
     
     
     while (1) {
-        bzero(packet.message, MESSAGE_LEN);
-        bzero(packet.option, OPTIONS_LEN);
-        bzero(packet.senderAlias, ALIAS_LEN);
+        memset(&packet, 0, sizeof(struct PACKET));
         
         numberOfBytes = recv(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
-        
         
         if (numberOfBytes < 0)
             printf("ERROR reading from socket\n");
         
-        write(1, packet.option, OPTIONS_LEN);
-        
         if (!strcmp(packet.option, "alias-ok")) {
             bzero(&currentAlias, ALIAS_LEN);
             strcpy(currentAlias, packet.message);
+        }
+        else if (!strcmp(packet.option, "error")) {
+            write(1, "Error from server: ", 19);
+            write(1, packet.message, MESSAGE_LEN);
+            write(1, "\n", 1);
         }
         else if (!strcmp(packet.option, "msg")) {
             write(1, packet.senderAlias, ALIAS_LEN);
