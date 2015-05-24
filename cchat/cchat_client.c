@@ -42,9 +42,12 @@ void *sender(void *args) {
             strcpy(packet.option, "join");
             strncpy(packet.message, temp + 6, ALIAS_LEN);
         }
-        else if (!strncmp("/create", temp, 7)){
+        else if (!strncmp("/create", temp, 7)) {
             strcpy(packet.option, "create");
             strncpy(packet.message, temp + 8, ALIAS_LEN);
+        }
+        else if (!strncmp("/leave", temp, 7)) {
+            strcpy(packet.option, "leave");
         }
         else  {
             strcpy(packet.option, "send");

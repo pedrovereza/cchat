@@ -142,6 +142,27 @@ void *client_handler(void *fd) {
             channel_delete(channelToLeave, &user);
             pthread_mutex_unlock(&channelToLeave->channel_mutex);
         }
+        else if (!strcmp(packet.option, "leave")) {
+            pthread_mutex_lock(&channels.channels_mutex);
+            channelIterator = channels_find(&channels, DEFAULT_CHANNEL_ALIAS);
+            struct CHANNEL *channelToJoin = &channelIterator->channel;
+            
+            channelIterator = channels_find(&channels, user.channelAlias);
+            struct CHANNEL *channelToLeave = &channelIterator->channel;
+            pthread_mutex_unlock(&channels.channels_mutex);
+            
+            pthread_mutex_lock(&channelToJoin->channel_mutex);
+            channel_insert(channelToJoin, &user);
+            pthread_mutex_unlock(&channelToJoin->channel_mutex);
+            
+            bzero(&user.channelAlias, ALIAS_LEN);
+            strcpy(user.channelAlias, channelToJoin->alias);
+            
+            pthread_mutex_lock(&channelToLeave->channel_mutex);
+            channel_delete(channelToLeave, &user);
+            pthread_mutex_unlock(&channelToLeave->channel_mutex);
+        }
+        
         
         else if(!strcmp(packet.option, "send")) {
             pthread_mutex_lock(&channels.channels_mutex);
