@@ -31,17 +31,26 @@ void *sender(void *args) {
         
         bzero(packet.message, MESSAGE_LEN);
         fgets(temp, MESSAGE_LEN, stdin);
+        temp[strcspn(temp, "\n")] = 0;
         
-        if (strncmp("/exit", temp, 5) == 0) {
+        if (!strncmp("/exit", temp, 5)) {
             strcpy(packet.option, "exit");
             send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
             return NULL;
         }
+        else if (!strncmp("/join", temp, 5)) {
+            strcpy(packet.option, "join");
+            strncpy(packet.message, temp + 6, ALIAS_LEN);
+        }
+        else if (!strncmp("/create", temp, 7)){
+            strcpy(packet.option, "create");
+            strncpy(packet.message, temp + 8, ALIAS_LEN);
+        }
         else  {
             strcpy(packet.option, "send");
+            strcpy(packet.message, temp);
         }
 
-        strcpy(packet.message, temp);
         strcpy(packet.senderAlias, "Alias1");
         numberOfBytes = send(sockfd, (void *)&packet, sizeof(struct PACKET), 0);
         
