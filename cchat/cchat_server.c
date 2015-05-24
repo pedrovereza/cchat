@@ -72,11 +72,28 @@ int main() {
     return 0;
 }
 
+void sendError(char *message, struct USER *user) {
+    struct PACKET response;
+    memset(&response, 0, sizeof(struct PACKET));
+    
+    strcpy(response.option, "error");
+    strncpy(response.message, message, MESSAGE_LEN);
+
+    send(user->socketfd, (void *)&response, sizeof(struct PACKET), 0);
+}
+
 void switchChannels(char* from, char* to, struct USER *user) {
     struct CNODE *channelIterator;
     
     pthread_mutex_lock(&channels.channels_mutex);
     channelIterator = channels_find(&channels, to);
+    
+    if (channelIterator == NULL) {
+        pthread_mutex_unlock(&channels.channels_mutex);
+        sendError("Channel does not exist. You can create using /create <alias>", user);
+        return;
+    }
+    
     struct CHANNEL *channelToJoin = &channelIterator->channel;
     
     channelIterator = channels_find(&channels, from);
@@ -145,11 +162,7 @@ void *client_handler(void *fd) {
             pthread_mutex_lock(&channels.channels_mutex);
             
             if (channels_contains(&channels, packet.message)) {
-                memset(&response, 0, sizeof(struct PACKET));
-                strcpy(response.option, "error");
-                strcpy(response.message, "Channel already exists.");
-                
-                send(user.socketfd, (void *)&response, sizeof(struct PACKET), 0);
+                sendError("Channel already exists.", &user);
             }
             else {
                 struct CHANNEL newChannel;
