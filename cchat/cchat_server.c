@@ -112,6 +112,18 @@ void switchChannels(char* from, char* to, struct USER *user) {
     pthread_mutex_unlock(&channelToLeave->channel_mutex);
 }
 
+void removeUser(struct USER *user) {
+    struct CNODE *channelIterator;
+    
+    channelIterator = channels_find(&channels, user->channelAlias);
+    struct CHANNEL *channel = &channelIterator->channel;
+    
+    pthread_mutex_lock(&channel->channel_mutex);
+    channel_delete(channel, user);
+    pthread_mutex_unlock(&channel->channel_mutex);
+    
+}
+
 void *client_handler(void *fd) {
     struct USER user = *(struct USER *)fd;
     struct PACKET packet;
@@ -125,10 +137,8 @@ void *client_handler(void *fd) {
         if(!bytes) {
             fprintf(stderr, "Connection lost from [%d] %s...\n", user.socketfd, user.alias);
             
-            pthread_mutex_lock(&defaultChannel.channel_mutex);
-            channel_delete(&defaultChannel, &user);
-            pthread_mutex_unlock(&defaultChannel.channel_mutex);
-            
+            removeUser(&user);
+
             break;
         }
         
@@ -206,9 +216,7 @@ void *client_handler(void *fd) {
         else if(!strcmp(packet.option, "exit")) {
             printf("[%d] %s has disconnected...\n", user.socketfd, user.alias);
             
-            pthread_mutex_lock(&defaultChannel.channel_mutex);
-            channel_delete(&defaultChannel, &user);
-            pthread_mutex_unlock(&defaultChannel.channel_mutex);
+            removeUser(&user);
             
             break;
         }
