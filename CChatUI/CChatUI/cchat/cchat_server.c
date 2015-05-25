@@ -16,9 +16,21 @@ void *client_handler(void *fd);
 
 struct CHANNEL defaultChannel;
 struct CHANNELS channels;
+int sockfd, newsockfd;
+
+
+void* cleanUp() {
+    char option[OPTIONS_LEN];
+    while(scanf("%s", option)==1) {
+        if (!strcmp(option, "/exit")) {
+            close(sockfd);
+        }
+    }
+    
+    return NULL;
+}
 
 int main() {
-    int sockfd, newsockfd;
     
     socklen_t clilen;
     
@@ -42,6 +54,10 @@ int main() {
         printf("ERROR on binding");
     
     listen(sockfd, MAX_USERS);
+    
+    pthread_t cleanUpThread;
+    
+    pthread_create(&cleanUpThread, NULL, cleanUp, NULL);
     
     while(1) {
         clilen = sizeof(struct sockaddr_in);
@@ -138,7 +154,6 @@ void *client_handler(void *fd) {
             fprintf(stderr, "Connection lost from [%d] %s...\n", user.socketfd, user.alias);
             
             removeUser(&user);
-
             break;
         }
         

@@ -72,7 +72,6 @@ struct CNODE* channels_find(struct CHANNELS *channels, char *alias) {
     struct CNODE *current;
 
     for (current = channels->head; current != NULL; current = current->next) {
-        write(1, current->channel.alias, ALIAS_LEN);
         if (!strncmp(current->channel.alias, alias, ALIAS_LEN)) {
             return current;
         }
